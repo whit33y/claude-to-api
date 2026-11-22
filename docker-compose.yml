@@ -1,0 +1,18 @@
+services:
+  app:
+    build: .
+    image: claude-docker:latest
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      # Local testing: only reachable from this machine.
+      - "127.0.0.1:${HOST_PORT:-8787}:8787"
+    volumes:
+      - ./workspace:/workspace           # files Claude can read/write
+      - ./data/claude:/home/node/.claude # session history (needed for resume)
+    # Hardening: no extra privileges, capped resources.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    mem_limit: 2g
+    pids_limit: 512

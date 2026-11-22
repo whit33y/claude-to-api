@@ -1,0 +1,24 @@
+# Use on the VPS:  docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d
+services:
+  app:
+    ports: !reset []   # not published; only Caddy can reach it
+    expose: ["8787"]
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [app]
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env, e.g. claude.example.com}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
