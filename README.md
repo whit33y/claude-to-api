@@ -343,6 +343,10 @@ Every `/v1/*` route requires `Authorization: Bearer $API_TOKEN`.
 | `effort` | no | `low`, `medium`, `high`, `xhigh` or `max` (default: `DEFAULT_EFFORT`; rejected above `MAX_EFFORT`) |
 | `system_prompt_append` | no | Extra instructions for this request |
 | `max_turns` | no | Limit on agent steps (default 20) |
+| `setting_sources` | no | Which settings Claude loads: any of `"user"`, `"project"`, `"local"` (default `["project"]`, i.e. `CLAUDE.md` and `.claude/settings.json` in `cwd`). Send `[]` when `cwd` holds untrusted code, so its hooks, MCP servers and `CLAUDE.md` are never loaded. With `restrict_to_cwd` the default is `[]` and only `"user"` is accepted |
+| `restrict_to_cwd` | no | `true` denies file tools (`Read`, `Grep`, `Glob`, `Edit`, `Write`, …) any path outside `cwd`, after following symlinks — e.g. `/proc/self/environ`, `/home/node/.claude` or other folders of `workspace/`. Only `Read`, `Grep`, `Glob`, `Edit`, `Write` and `NotebookEdit` may be combined with it (no `Bash` or `WebFetch`). Denied calls show up in `permission_denials` |
+
+**Running Claude on untrusted code** (e.g. reviewing a pull request): send `"setting_sources": []`, `"restrict_to_cwd": true` and read-only tools (`["Read","Grep","Glob"]`). Without them, instructions hidden in the code could make Claude read files elsewhere in the container, including the credential in the process environment. Also delete symlinks from the untrusted tree before the run: reads through a link that leaves `cwd` are blocked, but `Grep`/`Glob` may still walk into a linked directory.
 
 `/v1/ai-sdk/chat` accepts the same optional fields next to `useChat`'s `id` and `messages`.
 

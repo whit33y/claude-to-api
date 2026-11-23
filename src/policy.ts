@@ -1,6 +1,6 @@
 import path from "node:path";
 import { z } from "zod";
-import type { EffortLevel, PermissionMode } from "@anthropic-ai/claude-agent-sdk";
+import type { EffortLevel, PermissionMode, SettingSource } from "@anthropic-ai/claude-agent-sdk";
 
 /** Effort levels, lowest to highest. */
 const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const satisfies readonly EffortLevel[];
@@ -49,6 +49,10 @@ export const QueryRequest = z.object({
   effort: Effort.optional(),
   system_prompt_append: z.string().max(50_000).optional(),
   max_turns: z.number().int().min(1).optional(),
+  /** Which settings files the agent loads; send [] for untrusted code so no workspace hooks/MCP servers load. */
+  setting_sources: z.array(z.enum(["user", "project", "local"])).max(3).optional(),
+  /** Deny file tools any path outside the resolved cwd (for untrusted code, e.g. PR snapshots). */
+  restrict_to_cwd: z.boolean().optional(),
 });
 export type QueryRequest = z.infer<typeof QueryRequest>;
 
@@ -64,7 +68,12 @@ export interface ResolvedRun {
   effort?: EffortLevel;
   systemPromptAppend?: string;
   maxTurns: number;
+  settingSources: SettingSource[];
+  restrictToCwd: boolean;
 }
+
+/** The only tools whose path arguments the cwd guard understands; everything else is refused with restrict_to_cwd. */
+export const CWD_GUARDED_TOOLS = ["Read", "Grep", "Glob", "Edit", "Write", "NotebookEdit"];
 
 /** Validate a request against the server's limits and turn it into SDK-ready settings. */
 export function resolveRun(req: QueryRequest): ResolvedRun {
@@ -85,6 +94,20 @@ export function resolveRun(req: QueryRequest): ResolvedRun {
     throw new PolicyError("cwd must stay inside the workspace.");
   }
 
+  // restrict_to_cwd: only path-checkable tools, and no settings from inside the (untrusted) cwd,
+  // since project/local settings can define hooks and MCP servers that run outside any tool check.
+  let settingSources: SettingSource[] = req.setting_sources ?? (req.restrict_to_cwd ? [] : ["project"]);
+  if (req.restrict_to_cwd) {
+    const unsafe = tools.filter((t) => !CWD_GUARDED_TOOLS.includes(t));
+    if (unsafe.length) {
+      throw new PolicyError(`restrict_to_cwd only works with ${CWD_GUARDED_TOOLS.join(", ")}; not with: ${unsafe.join(", ")}.`);
+    }
+    if (settingSources.some((s) => s !== "user")) {
+      throw new PolicyError("restrict_to_cwd cannot load 'project' or 'local' settings (they come from the untrusted cwd).");
+    }
+  }
+  settingSources = [...new Set(settingSources)];
+
   const effort = req.effort ?? config.defaultEffort;
   if (effort && config.maxEffort && EFFORT_LEVELS.indexOf(effort) > EFFORT_LEVELS.indexOf(config.maxEffort)) {
     throw new PolicyError(`effort '${effort}' is above this server's limit '${config.maxEffort}'.`);
@@ -100,6 +123,8 @@ export function resolveRun(req: QueryRequest): ResolvedRun {
     effort,
     systemPromptAppend: req.system_prompt_append,
     maxTurns: Math.min(req.max_turns ?? 20, config.maxTurnsCeiling),
+    settingSources,
+    restrictToCwd: req.restrict_to_cwd ?? false,
   };
 }
 

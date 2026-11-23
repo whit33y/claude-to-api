@@ -1,4 +1,5 @@
 import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { cwdGuard } from "./cwd-guard.js";
 import { childEnv, type ResolvedRun } from "./policy.js";
 import { finishRun, type Run } from "./sessions.js";
 
@@ -42,7 +43,8 @@ export async function* runAgent(run: Run, spec: ResolvedRun): AsyncGenerator<Age
         permissionMode: spec.permissionMode,
         allowDangerouslySkipPermissions: spec.permissionMode === "bypassPermissions",
         systemPrompt: { type: "preset", preset: "claude_code", append: spec.systemPromptAppend },
-        settingSources: ["project"], // load CLAUDE.md / .claude/settings.json from the workspace
+        settingSources: spec.settingSources, // default ["project"]: CLAUDE.md / .claude/settings.json from the workspace
+        hooks: spec.restrictToCwd ? { PreToolUse: [cwdGuard(spec.cwd)] } : undefined,
         includePartialMessages: true,
         abortController: run.controller,
         env: childEnv(),
