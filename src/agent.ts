@@ -35,6 +35,7 @@ export async function* runAgent(run: Run, spec: ResolvedRun): AsyncGenerator<Age
         cwd: spec.cwd,
         resume: spec.resume,
         model: spec.model,
+        effort: spec.effort,
         maxTurns: spec.maxTurns,
         tools: spec.tools, // what exists
         allowedTools: spec.tools, // and is pre-approved

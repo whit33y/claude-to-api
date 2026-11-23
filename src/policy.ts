@@ -1,6 +1,10 @@
 import path from "node:path";
 import { z } from "zod";
-import type { PermissionMode } from "@anthropic-ai/claude-agent-sdk";
+import type { EffortLevel, PermissionMode } from "@anthropic-ai/claude-agent-sdk";
+
+/** Effort levels, lowest to highest. */
+const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const satisfies readonly EffortLevel[];
+const Effort = z.enum(EFFORT_LEVELS);
 
 /** Server-side configuration, read once from the environment. */
 export const config = {
@@ -8,6 +12,10 @@ export const config = {
   apiToken: process.env.API_TOKEN ?? "",
   workspaceDir: path.resolve(process.env.WORKSPACE_DIR ?? "/workspace"),
   defaultModel: process.env.DEFAULT_MODEL || undefined,
+  /** Effort used when a request doesn't pass one; undefined = the model's default. */
+  defaultEffort: envEffort("DEFAULT_EFFORT"),
+  /** Ceiling: the highest effort any request may ask for; undefined = no limit. */
+  maxEffort: envEffort("MAX_EFFORT"),
   /** Ceiling: the most tools any request may enable. */
   maxAllowedTools: csv(process.env.MAX_ALLOWED_TOOLS ?? "Read,Grep,Glob,Edit,Write,Bash,WebFetch,WebSearch"),
   /** Used when a request does not name any tools. */
@@ -18,6 +26,14 @@ export const config = {
   /** Browser origins allowed to call the API (CORS). Empty = no CORS headers. */
   corsOrigins: csv(process.env.CORS_ORIGINS ?? ""),
 };
+
+function envEffort(name: string): EffortLevel | undefined {
+  const value = process.env[name];
+  if (!value) return undefined;
+  const parsed = Effort.safeParse(value);
+  if (!parsed.success) throw new Error(`${name} must be one of ${EFFORT_LEVELS.join(", ")} (got "${value}").`);
+  return parsed.data;
+}
 
 function csv(value: string): string[] {
   return value.split(",").map((s) => s.trim()).filter(Boolean);
@@ -30,6 +46,7 @@ export const QueryRequest = z.object({
   permission_mode: z.enum(["default", "dontAsk", "acceptEdits", "plan", "bypassPermissions"]).optional(),
   cwd: z.string().max(500).optional(),
   model: z.string().max(100).optional(),
+  effort: Effort.optional(),
   system_prompt_append: z.string().max(50_000).optional(),
   max_turns: z.number().int().min(1).optional(),
 });
@@ -44,6 +61,7 @@ export interface ResolvedRun {
   permissionMode: PermissionMode;
   cwd: string;
   model?: string;
+  effort?: EffortLevel;
   systemPromptAppend?: string;
   maxTurns: number;
 }
@@ -67,6 +85,11 @@ export function resolveRun(req: QueryRequest): ResolvedRun {
     throw new PolicyError("cwd must stay inside the workspace.");
   }
 
+  const effort = req.effort ?? config.defaultEffort;
+  if (effort && config.maxEffort && EFFORT_LEVELS.indexOf(effort) > EFFORT_LEVELS.indexOf(config.maxEffort)) {
+    throw new PolicyError(`effort '${effort}' is above this server's limit '${config.maxEffort}'.`);
+  }
+
   return {
     prompt: req.prompt,
     resume: req.session_id,
@@ -74,6 +97,7 @@ export function resolveRun(req: QueryRequest): ResolvedRun {
     permissionMode: mode,
     cwd,
     model: req.model ?? config.defaultModel,
+    effort,
     systemPromptAppend: req.system_prompt_append,
     maxTurns: Math.min(req.max_turns ?? 20, config.maxTurnsCeiling),
   };

@@ -265,6 +265,8 @@ After editing, run `docker compose up -d`.
 | `DEFAULT_TOOLS` | Tools used when a request doesn't specify any | `Read,Grep,Glob` |
 | `ALLOW_BYPASS` | Allow `permission_mode: "bypassPermissions"` | `false` |
 | `DEFAULT_MODEL` | Model to use, e.g. `claude-sonnet-5-5`; empty = Claude Code's default | empty |
+| `DEFAULT_EFFORT` | Reasoning effort when a request doesn't set one: `low`, `medium`, `high`, `xhigh`, `max`; empty = model default | empty |
+| `MAX_EFFORT` | Highest `effort` a request may ask for (higher costs more tokens); empty = no limit | empty |
 | `MAX_CONCURRENT_RUNS` | How many requests may run at once | `2` |
 | `MAX_TURNS_CEILING` | Upper limit on agent steps per request | `50` |
 | `CORS_ORIGINS` | Browser origins allowed to call the API directly | empty |
@@ -338,6 +340,7 @@ Every `/v1/*` route requires `Authorization: Bearer $API_TOKEN`.
 | `permission_mode` | no | `default` (deny anything not allowed), `acceptEdits`, `plan` (plan only, no changes), `bypassPermissions` (needs `ALLOW_BYPASS=true`) |
 | `cwd` | no | Subfolder of `workspace/` to work in |
 | `model` | no | e.g. `claude-sonnet-5-5` |
+| `effort` | no | `low`, `medium`, `high`, `xhigh` or `max` (default: `DEFAULT_EFFORT`; rejected above `MAX_EFFORT`) |
 | `system_prompt_append` | no | Extra instructions for this request |
 | `max_turns` | no | Limit on agent steps (default 20) |
 
