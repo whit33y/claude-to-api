@@ -122,7 +122,7 @@ curl -N "http://127.0.0.1:8787/v1/query?stream=1" \
 You'll see `event: text` lines as Claude writes, then a final `event: result`.
 
 ### 3.4 Let Claude work with files
-By default Claude can only **read** (`Read`, `Grep`, `Glob`). To let it create or edit files, list the tools it may use and set `permission_mode` to `acceptEdits`:
+By default Claude can only **read** (`Read`, `Grep`, `Glob`). To let it create or edit files, list the tools it may use and set `permission_mode` to `acceptEdits`. The shipped `.env.example` (set up for cr-app) allows only the read-only tools, so first widen it, e.g. `MAX_ALLOWED_TOOLS=Read,Grep,Glob,Edit,Write`, and run `docker compose up -d`; otherwise this request returns 400 `Tools not permitted on this server`:
 ```bash
 curl -s http://127.0.0.1:8787/v1/query \
   -H "Authorization: Bearer $API_TOKEN" -H "Content-Type: application/json" \
@@ -255,6 +255,8 @@ Testing straight from a browser page without a server route? Add the page's addr
 ## 5. Configuration (`.env`)
 
 After editing, run `docker compose up -d`.
+
+`.env.example` is set up as the Claude backend for cr-app: `DEFAULT_MODEL=claude-sonnet-5-5`, `DEFAULT_EFFORT` / `MAX_EFFORT` = `high`, `MAX_ALLOWED_TOOLS=Read,Grep,Glob`. The Default column below is what the server uses when a variable is not set at all; note that an empty `MAX_ALLOWED_TOOLS=` or `DEFAULT_TOOLS=` means no tools, not the default list. Don't set `ANTHROPIC_BASE_URL` / `ANTHROPIC_AUTH_TOKEN`: they send every request to another endpoint and take precedence over `CLAUDE_CODE_OAUTH_TOKEN`.
 
 | Variable | What it does | Default |
 |---|---|---|

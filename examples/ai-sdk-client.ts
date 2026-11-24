@@ -7,7 +7,7 @@ const transport = new DefaultChatTransport<UIMessage>({
   api: `${BASE}/v1/ai-sdk/chat`,
   headers: { Authorization: `Bearer ${process.env.API_TOKEN}` },
   // Optional agent options, merged into every request body:
-  body: { allowed_tools: ["Read", "Write", "Glob"], permission_mode: "acceptEdits" },
+  body: { allowed_tools: ["Read", "Grep", "Glob"] },
 });
 
 const chatId = `demo-${Date.now()}`;
@@ -37,4 +37,4 @@ async function send(text: string) {
 }
 
 await send("Remember the word: mango. Reply in one sentence.");
-await send("Which word did I ask you to remember? Then create ai-sdk.txt containing that word.");
+await send("Which word did I ask you to remember? Then list the files in your working directory.");
