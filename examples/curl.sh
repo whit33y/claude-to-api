@@ -15,6 +15,6 @@ echo "== 2) continue the same conversation"
 curl -fsS "${AUTH[@]}" "$BASE/v1/query" \
   -d "{\"prompt\":\"What word did I ask you to remember?\",\"session_id\":\"$SID\"}" | jq '{result, session_id, total_cost_usd}'
 
-echo "== 3) streaming with read-only file tools (the tools .env.example allows)"
+echo "== 3) streaming with read-only file tools"
 curl -N -sS "${AUTH[@]}" "$BASE/v1/query?stream=1" \
   -d '{"prompt":"List the files in this directory and summarize what is there in two sentences.","allowed_tools":["Read","Grep","Glob"]}'

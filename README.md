@@ -122,7 +122,7 @@ curl -N "http://127.0.0.1:8787/v1/query?stream=1" \
 You'll see `event: text` lines as Claude writes, then a final `event: result`.
 
 ### 3.4 Let Claude work with files
-By default Claude can only **read** (`Read`, `Grep`, `Glob`). To let it create or edit files, list the tools it may use and set `permission_mode` to `acceptEdits`. The shipped `.env.example` (set up for cr-app) allows only the read-only tools, so first widen it, e.g. `MAX_ALLOWED_TOOLS=Read,Grep,Glob,Edit,Write`, and run `docker compose up -d`; otherwise this request returns 400 `Tools not permitted on this server`:
+By default Claude can only **read** (`Read`, `Grep`, `Glob`). To let it create or edit files, list the tools it may use and set `permission_mode` to `acceptEdits`. The shipped `.env.example` permits these (`MAX_ALLOWED_TOOLS=Read,Grep,Glob,Edit,Write`); if your `.env` allows fewer, this request returns 400 `Tools not permitted on this server`:
 ```bash
 curl -s http://127.0.0.1:8787/v1/query \
   -H "Authorization: Bearer $API_TOKEN" -H "Content-Type: application/json" \
@@ -256,7 +256,7 @@ Testing straight from a browser page without a server route? Add the page's addr
 
 After editing, run `docker compose up -d`.
 
-`.env.example` is set up as the Claude backend for cr-app: `DEFAULT_MODEL=claude-sonnet-5-5`, `DEFAULT_EFFORT` / `MAX_EFFORT` = `high`, `MAX_ALLOWED_TOOLS=Read,Grep,Glob`. The Default column below is what the server uses when a variable is not set at all; note that an empty `MAX_ALLOWED_TOOLS=` or `DEFAULT_TOOLS=` means no tools, not the default list. Don't set `ANTHROPIC_BASE_URL` / `ANTHROPIC_AUTH_TOKEN`: they send every request to another endpoint and take precedence over `CLAUDE_CODE_OAUTH_TOKEN`.
+`.env.example` ships with `DEFAULT_MODEL=claude-sonnet-5-5`, `DEFAULT_EFFORT` / `MAX_EFFORT` = `high`, `MAX_ALLOWED_TOOLS=Read,Grep,Glob,Edit,Write` (no `Bash` or internet tools) and read-only `DEFAULT_TOOLS`. The Default column below is what the server uses when a variable is not set at all; note that an empty `MAX_ALLOWED_TOOLS=` or `DEFAULT_TOOLS=` means no tools, not the default list. Don't set `ANTHROPIC_BASE_URL` / `ANTHROPIC_AUTH_TOKEN`: they send every request to another endpoint and take precedence over `CLAUDE_CODE_OAUTH_TOKEN`.
 
 | Variable | What it does | Default |
 |---|---|---|
@@ -345,10 +345,8 @@ Every `/v1/*` route requires `Authorization: Bearer $API_TOKEN`.
 | `effort` | no | `low`, `medium`, `high`, `xhigh` or `max` (default: `DEFAULT_EFFORT`; rejected above `MAX_EFFORT`) |
 | `system_prompt_append` | no | Extra instructions for this request |
 | `max_turns` | no | Limit on agent steps (default 20) |
-| `setting_sources` | no | Which settings Claude loads: any of `"user"`, `"project"`, `"local"` (default `["project"]`, i.e. `CLAUDE.md` and `.claude/settings.json` in `cwd`). Send `[]` when `cwd` holds untrusted code, so its hooks, MCP servers and `CLAUDE.md` are never loaded. With `restrict_to_cwd` the default is `[]` and only `"user"` is accepted |
-| `restrict_to_cwd` | no | `true` denies file tools (`Read`, `Grep`, `Glob`, `Edit`, `Write`, …) any path outside `cwd`, after following symlinks — e.g. `/proc/self/environ`, `/home/node/.claude` or other folders of `workspace/`. Only `Read`, `Grep`, `Glob`, `Edit`, `Write` and `NotebookEdit` may be combined with it (no `Bash` or `WebFetch`). Denied calls show up in `permission_denials` |
 
-**Running Claude on untrusted code** (e.g. reviewing a pull request): send `"setting_sources": []`, `"restrict_to_cwd": true` and read-only tools (`["Read","Grep","Glob"]`). Without them, instructions hidden in the code could make Claude read files elsewhere in the container, including the credential in the process environment. Also delete symlinks from the untrusted tree before the run: reads through a link that leaves `cwd` are blocked, but `Grep`/`Glob` may still walk into a linked directory.
+Claude loads `CLAUDE.md` and `.claude/settings.json` from `cwd`. Only put code you trust in `workspace/`: Claude's tools are not confined to `cwd`, so instructions hidden in untrusted code could make it read other files in the container.
 
 `/v1/ai-sdk/chat` accepts the same optional fields next to `useChat`'s `id` and `messages`.
 
